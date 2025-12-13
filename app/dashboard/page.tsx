@@ -71,7 +71,7 @@ export default function DashboardPage() {
                 {/* Badge Kelas */}
                 <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-50 text-blue-700">
                   <Book className="w-3 h-3 mr-1.5" />
-                  Kelas {profile?.Class?.name || 'Belum Diatur'}
+                  Kelas: {profile?.Class?.name || 'Belum Diatur'}
                 </span>
                 
                 {/* Badge Status Aktif */}

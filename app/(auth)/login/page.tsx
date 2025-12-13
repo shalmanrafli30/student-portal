@@ -72,12 +72,12 @@ export default function LoginPage() {
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">NIS / Username</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">NIS</label>
             <input
               type="text"
               required
-              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-              placeholder="Masukkan NIS (cth: 20256940)"
+              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-gray-400"
+              placeholder="Masukkan NIS (ex: 20256940)"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
             />
@@ -87,7 +87,7 @@ export default function LoginPage() {
             <input
               type="password"
               required
-              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-gray-400"
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
