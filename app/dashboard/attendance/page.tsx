@@ -1,32 +1,34 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import api from '@/lib/api';
-import { UserCheck, UserX, Clock, FileText, CalendarCheck, Calendar } from 'lucide-react';
+import { UserCheck, UserX, Clock, FileText, CalendarCheck, Loader2, BookOpen } from 'lucide-react';
 
-// Sesuaikan interface dengan Model Sequelize
+// Interface disesuaikan dengan Controller Baru
 interface Attendance {
   id: number;
-  date: string; // DATEONLY dari DB = string "YYYY-MM-DD"
+  date: string;
   status: 'Present' | 'Absent' | 'Late' | 'Excused';
   createdAt: string;
+  // Relasi dari Backend
+  Schedule?: {
+    startTime: string;
+    Subject?: {
+        name: string;
+    }
+  };
 }
 
 export default function AttendancePage() {
   const [attendanceList, setAttendanceList] = useState<Attendance[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // --- FETCH DATA ---
+  // 1. Fetch Data
   useEffect(() => {
     const fetchAttendance = async () => {
       try {
-        const res = await api.get('/attendance');
-        // Handle response structure
-        const data = Array.isArray(res.data) ? res.data : res.data.data || res.data.attendance || [];
-        
-        // Opsional: Sorting dari tanggal terbaru ke terlama
-        data.sort((a: Attendance, b: Attendance) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        
+        const res = await api.get('/attendance'); // Pastikan route backend benar
+        const data = Array.isArray(res.data.data) ? res.data.data : (Array.isArray(res.data) ? res.data : []);
         setAttendanceList(data);
       } catch (error) {
         console.error('Gagal ambil data kehadiran', error);
@@ -38,149 +40,144 @@ export default function AttendancePage() {
     fetchAttendance();
   }, []);
 
-  // --- STATISTIK ---
-  // Menghitung jumlah status secara manual dari data frontend
-  const stats = {
-    present: attendanceList.filter((a) => a.status === 'Present').length,
-    late: attendanceList.filter((a) => a.status === 'Late').length,
-    excused: attendanceList.filter((a) => a.status === 'Excused').length,
-    absent: attendanceList.filter((a) => a.status === 'Absent').length,
-  };
-  
-  // Persentase Kehadiran (Present + Late dianggap masuk)
-  const totalDays = attendanceList.length;
-  const attendancePercentage = totalDays > 0 
-    ? (((stats.present + stats.late) / totalDays) * 100).toFixed(0) 
-    : 0;
-
-  // --- HELPERS ---
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('id-ID', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
+  // 2. Logic Grouping (Per Mapel)
+  const groupedAttendance = useMemo(() => {
+    const groups: Record<string, Attendance[]> = {};
+    
+    attendanceList.forEach((item) => {
+      // Ambil nama mapel dari relasi Schedule -> Subject
+      const subjectName = item.Schedule?.Subject?.name || 'Kegiatan Lain';
+      
+      if (!groups[subjectName]) {
+        groups[subjectName] = [];
+      }
+      groups[subjectName].push(item);
     });
-  };
 
+    return groups;
+  }, [attendanceList]);
+
+  // Helper: Config Icon & Warna Status
   const getStatusConfig = (status: string) => {
     switch (status) {
-      case 'Present':
-        return { label: 'Hadir', color: 'bg-green-100 text-green-700', icon: UserCheck };
-      case 'Late':
-        return { label: 'Terlambat', color: 'bg-yellow-100 text-yellow-700', icon: Clock };
-      case 'Excused':
-        return { label: 'Izin/Sakit', color: 'bg-blue-100 text-blue-700', icon: FileText };
-      case 'Absent':
-        return { label: 'Alpa', color: 'bg-red-100 text-red-700', icon: UserX };
-      default:
-        return { label: status, color: 'bg-gray-100 text-gray-700', icon: Calendar };
+      case 'Present': return { label: 'Hadir', color: 'text-green-600 bg-green-50 border-green-200', icon: UserCheck };
+      case 'Late':    return { label: 'Terlambat', color: 'text-yellow-600 bg-yellow-50 border-yellow-200', icon: Clock };
+      case 'Excused': return { label: 'Izin', color: 'text-blue-600 bg-blue-50 border-blue-200', icon: FileText };
+      case 'Absent':  return { label: 'Alpa', color: 'text-red-600 bg-red-50 border-red-200', icon: UserX };
+      default:        return { label: status, color: 'text-gray-600 bg-gray-50', icon: UserCheck };
     }
   };
 
-  if (loading) return <div className="p-8 text-center text-gray-500">Memuat data absensi...</div>;
+  // Helper: Hitung Persentase Kehadiran per Group
+  const calculatePercentage = (items: Attendance[]) => {
+    if (items.length === 0) return 0;
+    // Hadir & Terlambat dianggap masuk
+    const presentCount = items.filter(i => i.status === 'Present' || i.status === 'Late').length;
+    return Math.round((presentCount / items.length) * 100);
+  };
+
+  // Helper: Hitung Global Stats
+  const globalStats = useMemo(() => {
+    const total = attendanceList.length;
+    const present = attendanceList.filter(a => a.status === 'Present' || a.status === 'Late').length;
+    const percentage = total > 0 ? Math.round((present / total) * 100) : 0;
+    return { total, percentage };
+  }, [attendanceList]);
+
+
+  if (loading) return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] text-gray-400">
+        <Loader2 className="w-10 h-10 mb-2 animate-spin text-blue-600" />
+        <p>Memuat Data Absensi...</p>
+    </div>
+  );
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
-        <CalendarCheck className="mr-3 text-blue-600" /> Riwayat Kehadiran
-      </h1>
-
-      {/* --- BAGIAN 1: KARTU STATISTIK --- */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        {/* Hadir */}
-        <div className="bg-white p-4 rounded-xl border shadow-sm flex flex-col items-center justify-center">
-            <div className="bg-green-100 p-2 rounded-full mb-2">
-                <UserCheck className="w-5 h-5 text-green-600" />
-            </div>
-            <span className="text-2xl font-bold text-gray-800">{stats.present}</span>
-            <span className="text-xs text-gray-500">Hadir</span>
+      {/* HEADER & GLOBAL STATS */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8">
+        <div>
+            <h1 className="text-2xl font-bold text-gray-800 flex items-center">
+                <CalendarCheck className="mr-3 text-blue-600" /> Riwayat Kehadiran
+            </h1>
+            <p className="text-gray-500 text-sm mt-1 ml-9">Monitoring kehadiran per mata pelajaran.</p>
         </div>
-
-        {/* Terlambat */}
-        <div className="bg-white p-4 rounded-xl border shadow-sm flex flex-col items-center justify-center">
-            <div className="bg-yellow-100 p-2 rounded-full mb-2">
-                <Clock className="w-5 h-5 text-yellow-600" />
+        
+        <div className="mt-4 md:mt-0 flex space-x-4 ml-9 md:ml-0">
+             {/* Card Global Persentase */}
+            <div className={`px-5 py-2 rounded-lg shadow-sm border flex items-center ${globalStats.percentage >= 90 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                <div className={`w-2 h-2 rounded-full mr-2 ${globalStats.percentage >= 90 ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                <div>
+                    <p className="text-xs text-gray-500">Total Kehadiran</p>
+                    <p className={`font-bold text-lg ${globalStats.percentage >= 90 ? 'text-green-700' : 'text-red-700'}`}>
+                        {globalStats.percentage}%
+                    </p>
+                </div>
             </div>
-            <span className="text-2xl font-bold text-gray-800">{stats.late}</span>
-            <span className="text-xs text-gray-500">Terlambat</span>
-        </div>
-
-        {/* Izin/Sakit */}
-        <div className="bg-white p-4 rounded-xl border shadow-sm flex flex-col items-center justify-center">
-            <div className="bg-blue-100 p-2 rounded-full mb-2">
-                <FileText className="w-5 h-5 text-blue-600" />
-            </div>
-            <span className="text-2xl font-bold text-gray-800">{stats.excused}</span>
-            <span className="text-xs text-gray-500">Izin/Sakit</span>
-        </div>
-
-        {/* Alpa */}
-        <div className="bg-white p-4 rounded-xl border shadow-sm flex flex-col items-center justify-center">
-            <div className="bg-red-100 p-2 rounded-full mb-2">
-                <UserX className="w-5 h-5 text-red-600" />
-            </div>
-            <span className="text-2xl font-bold text-gray-800">{stats.absent}</span>
-            <span className="text-xs text-gray-500">Alpa</span>
         </div>
       </div>
 
-      {/* --- BANNER PERSENTASE --- */}
-      <div className="bg-blue-600 text-white rounded-xl p-6 shadow-md mb-8 flex justify-between items-center">
-         <div>
-            <h3 className="text-lg font-semibold">Persentase Kehadiran</h3>
-            <p className="text-blue-100 text-sm">Pertahankan kehadiranmu di atas 90%!</p>
-         </div>
-         <div className="text-4xl font-bold">
-            {attendancePercentage}%
-         </div>
-      </div>
-
-      {/* --- BAGIAN 2: TABEL RIWAYAT --- */}
-      <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                <th className="px-6 py-4 font-semibold text-gray-600">Tanggal</th>
-                <th className="px-6 py-4 font-semibold text-gray-600">Status</th>
-                <th className="px-6 py-4 font-semibold text-gray-600">Waktu Input</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {attendanceList.length === 0 ? (
-                <tr>
-                  <td colSpan={3} className="px-6 py-8 text-center text-gray-500">
-                    Belum ada data absensi.
-                  </td>
-                </tr>
-              ) : (
-                attendanceList.map((item) => {
-                  const config = getStatusConfig(item.status);
-                  const StatusIcon = config.icon;
-                  
-                  return (
-                    <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 font-medium text-gray-800">
-                        {formatDate(item.date)}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${config.color}`}>
-                          <StatusIcon className="w-3 h-3 mr-1.5" />
-                          {config.label}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">
-                         {new Date(item.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+      {/* --- CONTENT GRID --- */}
+      {Object.keys(groupedAttendance).length === 0 ? (
+        <div className="text-center py-20 bg-white rounded-xl border border-dashed text-gray-400">
+           <UserX className="w-12 h-12 mx-auto mb-3 opacity-20" />
+           <p>Belum ada data absensi.</p>
         </div>
-      </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {Object.entries(groupedAttendance).map(([subjectName, items]) => {
+             const percentage = calculatePercentage(items);
+             
+             return (
+              <div key={subjectName} className="bg-white rounded-xl shadow-sm border hover:shadow-md transition-all duration-200 overflow-hidden flex flex-col">
+                
+                {/* Header Card */}
+                <div className="p-4 border-b bg-gray-50 flex justify-between items-start">
+                    <div className="flex items-center overflow-hidden">
+                        <div className="bg-white p-2 rounded-lg border mr-3 text-blue-600 shrink-0">
+                            <BookOpen className="w-4 h-4" />
+                        </div>
+                        <h3 className="font-bold text-gray-800 text-sm truncate pr-2">{subjectName}</h3>
+                    </div>
+                    
+                    {/* Badge Persentase Mapel */}
+                    <div className={`px-2 py-1 rounded text-xs font-bold border ${percentage >= 80 ? 'bg-green-100 text-green-700 border-green-200' : 'bg-red-100 text-red-700 border-red-200'}`}>
+                        {percentage}%
+                    </div>
+                </div>
+
+                {/* Body: List 5 Terakhir saja agar tidak kepanjangan */}
+                <div className="p-0 flex-1">
+                    <div className="divide-y">
+                        {items.slice(0, 5).map((item) => { // Tampilkan max 5 history
+                            const config = getStatusConfig(item.status);
+                            const Icon = config.icon;
+                            return (
+                                <div key={item.id} className="p-3 flex justify-between items-center hover:bg-gray-50 text-sm">
+                                    <div className="flex items-center text-gray-600">
+                                        <span className="text-xs font-medium w-24">
+                                            {new Date(item.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
+                                        </span>
+                                    </div>
+                                    <div className={`flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${config.color}`}>
+                                        <Icon className="w-3 h-3 mr-1" />
+                                        {config.label}
+                                    </div>
+                                </div>
+                            )
+                        })}
+                        {items.length > 5 && (
+                            <div className="p-2 text-center text-xs text-gray-400 bg-gray-50">
+                                +{items.length - 5} riwayat lainnya
+                            </div>
+                        )}
+                    </div>
+                </div>
+              </div>
+             );
+          })}
+        </div>
+      )}
     </div>
   );
 }
