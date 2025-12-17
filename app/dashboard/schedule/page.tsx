@@ -2,16 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
-import { Calendar, Clock, User, BookOpen, AlertCircle } from 'lucide-react';
+import { Calendar, Clock, User, BookOpen, AlertCircle, Loader2 } from 'lucide-react';
 
-// Interface sesuai Model-Model yang Anda berikan
+// Interface
 interface ScheduleItem {
   id: number;
-  day: string; // ENUM: 'Monday', 'Tuesday', ...
-  startTime: string; // TIME format "HH:mm:ss"
-  endTime: string;   // TIME format "HH:mm:ss"
-  
-  // Relasi (biasanya di-include oleh backend)
+  day: string; // 'Monday', 'Tuesday', ...
+  startTime: string; 
+  endTime: string;   
   Subject?: {
     name: string;
     code: string;
@@ -29,8 +27,9 @@ export default function SchedulePage() {
   useEffect(() => {
     const fetchSchedule = async () => {
       try {
+        // Update endpoint agar sesuai dengan controller backend (/student/schedules)
         const res = await api.get('/schedule'); 
-        const data = Array.isArray(res.data) ? res.data : res.data.data || [];
+        const data = Array.isArray(res.data.data) ? res.data.data : (Array.isArray(res.data) ? res.data : []);
         setSchedules(data);
       } catch (error) {
         console.error('Gagal ambil jadwal', error);
@@ -42,91 +41,115 @@ export default function SchedulePage() {
     fetchSchedule();
   }, []);
 
-  // Urutan hari harus sama persis dengan ENUM di database (Case Sensitive)
+  // Urutan hari untuk sorting (Senin - Sabtu)
   const daysOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-  // Penerjemah hari ke Bahasa Indonesia
+  // Helper Translate Hari
   const translateDay = (day: string) => {
     const map: Record<string, string> = {
       'Monday': 'Senin', 'Tuesday': 'Selasa', 'Wednesday': 'Rabu',
-      'Thursday': 'Kamis', 'Friday': 'Jumat', 'Saturday': 'Sabtu'
+      'Thursday': 'Kamis', 'Friday': 'Jumat', 'Saturday': 'Sabtu', 'Sunday': 'Minggu'
     };
     return map[day] || day;
   };
 
-  // Helper format jam (07:00:00 -> 07:00)
+  // Helper Format Jam (07:00:00 -> 07:00)
   const formatTime = (time: string) => {
     if (!time) return '--:--';
     return time.split(':').slice(0, 2).join(':');
   };
 
-  // Grouping
+  // Grouping Logic: Mengelompokkan Array Flat menjadi Object per Hari
   const groupedSchedules = daysOrder.reduce((acc, day) => {
     const items = schedules.filter((item) => item.day === day);
     if (items.length > 0) {
-      // Sort berdasarkan jam mulai
+      // Sort mapel berdasarkan jam mulai
       items.sort((a, b) => a.startTime.localeCompare(b.startTime));
       acc[day] = items;
     }
     return acc;
   }, {} as Record<string, ScheduleItem[]>);
 
-  if (loading) return <div className="p-8 text-center text-gray-500">Loading jadwal pelajaran...</div>;
+  if (loading) return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] text-gray-400">
+        <Loader2 className="w-10 h-10 mb-2 animate-spin text-blue-600" />
+        <p>Memuat jadwal pelajaran...</p>
+    </div>
+  );
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
-        <Calendar className="mr-3 text-blue-600" /> Jadwal Pelajaran
-      </h1>
+      {/* Header Halaman */}
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-gray-800 flex items-center">
+            <Calendar className="mr-3 text-blue-600" /> Jadwal Pelajaran
+        </h1>
+        <p className="text-gray-500 text-sm mt-1 ml-9">
+            Daftar mata pelajaran aktif semester ini.
+        </p>
+      </div>
 
+      {/* Konten Jadwal */}
       {Object.keys(groupedSchedules).length === 0 ? (
-        <div className="flex flex-col items-center justify-center bg-white p-12 rounded-xl border border-dashed">
-          <AlertCircle className="w-12 h-12 text-gray-300 mb-3" />
-          <p className="text-gray-500">Belum ada jadwal yang diatur untuk kelasmu.</p>
+        <div className="flex flex-col items-center justify-center bg-white p-16 rounded-xl border border-dashed text-center">
+          <div className="bg-gray-100 p-4 rounded-full mb-4">
+             <AlertCircle className="w-8 h-8 text-gray-400" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-700">Belum Ada Jadwal</h3>
+          <p className="text-gray-500 max-w-sm mt-1">
+            Jadwal pelajaran untuk kelas Anda belum diatur oleh admin kurikulum.
+          </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {/* Loop setiap hari yang ada jadwalnya */}
           {Object.entries(groupedSchedules).map(([day, items]) => (
-            <div key={day} className="bg-white rounded-xl shadow-sm border overflow-hidden hover:shadow-md transition-shadow">
+            <div key={day} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all duration-200">
+              
               {/* Header Hari */}
-              <div className="bg-blue-50 px-6 py-3 border-b border-blue-100 flex justify-between items-center">
-                <h3 className="font-bold text-blue-700">{translateDay(day)}</h3>
-                <span className="text-xs bg-white text-blue-600 border border-blue-200 px-2 py-0.5 rounded-full font-medium">
+              <div className="bg-blue-50 px-5 py-3 border-b border-blue-100 flex justify-between items-center">
+                <h3 className="font-bold text-blue-800">{translateDay(day)}</h3>
+                <span className="text-xs bg-white text-blue-600 border border-blue-200 px-2.5 py-0.5 rounded-full font-bold">
                   {items.length} Mapel
                 </span>
               </div>
               
-              {/* List Pelajaran */}
-              <div className="p-4 space-y-3">
-                {items.map((item) => (
-                  <div key={item.id} className="flex items-start pb-3 border-b last:border-0 last:pb-0">
-                    {/* Waktu */}
-                    <div className="bg-gray-100 p-2 rounded-lg mr-3 text-center min-w-[65px]">
+              {/* List Mata Pelajaran */}
+              <div className="p-0">
+                {items.map((item, index) => (
+                  <div key={item.id} className={`flex items-start p-4 ${index !== items.length - 1 ? 'border-b border-gray-50' : ''} hover:bg-gray-50 transition-colors`}>
+                    
+                    {/* Kolom Waktu */}
+                    <div className="bg-gray-100 p-2 rounded-lg mr-4 text-center min-w-[70px] flex flex-col justify-center border border-gray-200">
                       <Clock className="w-3.5 h-3.5 text-gray-500 mx-auto mb-1" />
-                      <span className="text-xs font-bold text-gray-700 block">
+                      <span className="text-xs font-bold text-gray-800 block leading-tight">
                         {formatTime(item.startTime)}
                       </span>
-                      <span className="text-[10px] text-gray-500 block">
-                        - {formatTime(item.endTime)}
+                      <span className="text-[10px] text-gray-400 block mt-0.5">
+                        s/d {formatTime(item.endTime)}
                       </span>
                     </div>
 
-                    {/* Detail Mapel */}
-                    <div className="flex-1">
-                      <h4 className="font-bold text-gray-800 text-sm flex items-center">
-                        {item.Subject?.name || 'Mapel Umum'}
+                    {/* Kolom Detail */}
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-bold text-gray-800 text-sm truncate pr-2" title={item.Subject?.name}>
+                        {item.Subject?.name || 'Mata Pelajaran'}
                       </h4>
+                      
+                      {/* Kode Mapel (Opsional) */}
                       {item.Subject?.code && (
-                        <span className="text-[10px] text-gray-400 block mb-1">
-                          Kode: {item.Subject.code}
-                        </span>
+                        <div className="flex items-center text-[10px] text-gray-400 mb-1.5">
+                           <BookOpen className="w-3 h-3 mr-1" /> {item.Subject.code}
+                        </div>
                       )}
                       
-                      <div className="flex items-center text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded mt-1 w-fit">
-                        <User className="w-3 h-3 mr-1.5" />
-                        {item.Teacher?.name || 'Guru Pengganti'}
+                      {/* Nama Guru */}
+                      <div className="inline-flex items-center text-xs text-gray-600 bg-blue-50 px-2 py-1 rounded border border-blue-100 max-w-full">
+                        <User className="w-3 h-3 mr-1.5 shrink-0 text-blue-500" />
+                        <span className="truncate">{item.Teacher?.name || 'Guru Belum Ditentukan'}</span>
                       </div>
                     </div>
+
                   </div>
                 ))}
               </div>
