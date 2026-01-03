@@ -17,6 +17,7 @@ interface StudentProfile {
   photo?: string;
   isActive: boolean;
   isCatering: boolean;
+  ClassName?: string;
   Class?: {
     id: number;
     name: string;
@@ -26,15 +27,17 @@ interface StudentProfile {
 
 interface Schedule {
   id: number;
-  day: string; // "Monday", "Tuesday", dst.
-  startTime: string; // "08:00:00"
+  day: string; 
+  startTime: string; 
   endTime: string;
-  Subject?: {
-    name: string;
-  };
-  Teacher?: {
-    name: string;
-  };
+  // Update: Menyesuaikan dengan respon API terbaru
+  subjectName?: string;
+  subjectCode?: string; // [BARU] Kode Mapel
+  teacherName?: string; // [BARU] Nama Guru
+  
+  // Fallback (jika API berubah lagi)
+  Subject?: { name: string; };
+  Teacher?: { name: string; };
 }
 
 export default function DashboardPage() {
@@ -146,7 +149,7 @@ export default function DashboardPage() {
                             <Users className="w-3 h-3 mr-1.5" /> NIS: {profile?.nis}
                         </span>
                         <span className="flex items-center text-sm font-medium bg-blue-50 text-blue-700 px-2 py-0.5 rounded">
-                            <Book className="w-3 h-3 mr-1.5" /> Kelas {profile?.Class?.name || '-'}
+                            <Book className="w-3 h-3 mr-1.5" /> Kelas {profile?.ClassName || profile?.Class?.name || '-'}
                         </span>
                         {profile?.isCatering && (
                             <span className="flex items-center text-sm font-medium bg-orange-50 text-orange-700 px-2 py-0.5 rounded">
@@ -217,7 +220,7 @@ export default function DashboardPage() {
                             {schedule.startTime.slice(0, 5)}
                         </div>
                         <div className="overflow-hidden">
-                            <p className="text-sm font-bold text-gray-800 truncate">{schedule.Subject?.name}</p>
+                            <p className="text-sm font-bold text-gray-800 truncate">{schedule.subjectName || schedule.Subject?.name || 'Mata Pelajaran'}</p>
                             <p className="text-xs text-gray-500 truncate">{schedule.Teacher?.name || 'Guru Pengampu'}</p>
                         </div>
                     </div>

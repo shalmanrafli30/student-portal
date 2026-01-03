@@ -9,7 +9,10 @@ interface Grade {
   type: string;
   score: number;
   createdAt: string;
-  Subject?: { name: string }; 
+  studentId: number;
+  subjectId: number;
+  subjectName?: string;
+  Subject?: { name: string }; // Fallback
 }
 
 export default function GradesPage() {
@@ -37,7 +40,7 @@ export default function GradesPage() {
     const groups: Record<string, Grade[]> = {};
     
     grades.forEach((grade) => {
-      const subjectName = grade.Subject?.name || 'Lainnya';
+      const subjectName = grade.subjectName || 'Lainnya';
       if (!groups[subjectName]) {
         groups[subjectName] = [];
       }

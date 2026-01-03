@@ -7,17 +7,17 @@ import { Calendar, Clock, User, BookOpen, AlertCircle, Loader2 } from 'lucide-re
 // Interface
 interface ScheduleItem {
   id: number;
-  day: string; // 'Monday', 'Tuesday', ...
+  day: string; 
   startTime: string; 
-  endTime: string;   
-  Subject?: {
-    name: string;
-    code: string;
-  };
-  Teacher?: {
-    name: string;
-    nip: string;
-  };
+  endTime: string;
+  // Update: Menyesuaikan dengan respon API terbaru
+  subjectName?: string;
+  subjectCode?: string; // [BARU] Kode Mapel
+  teacherName?: string; // [BARU] Nama Guru
+  
+  // Fallback (jika API berubah lagi)
+  Subject?: { name: string; };
+  Teacher?: { name: string; };
 }
 
 export default function SchedulePage() {
@@ -133,20 +133,20 @@ export default function SchedulePage() {
                     {/* Kolom Detail */}
                     <div className="flex-1 min-w-0">
                       <h4 className="font-bold text-gray-800 text-sm truncate pr-2" title={item.Subject?.name}>
-                        {item.Subject?.name || 'Mata Pelajaran'}
+                        {item.subjectName || item.Subject?.name || 'Mata Pelajaran'}
                       </h4>
                       
                       {/* Kode Mapel (Opsional) */}
-                      {item.Subject?.code && (
+                      {item.subjectCode && (
                         <div className="flex items-center text-[10px] text-gray-400 mb-1.5">
-                           <BookOpen className="w-3 h-3 mr-1" /> {item.Subject.code}
+                          <BookOpen className="w-3 h-3 mr-1" /> {item.subjectCode}
                         </div>
                       )}
                       
                       {/* Nama Guru */}
                       <div className="inline-flex items-center text-xs text-gray-600 bg-blue-50 px-2 py-1 rounded border border-blue-100 max-w-full">
                         <User className="w-3 h-3 mr-1.5 shrink-0 text-blue-500" />
-                        <span className="truncate">{item.Teacher?.name || 'Guru Belum Ditentukan'}</span>
+                        <span className="truncate">Guru: {item.teacherName || 'Guru Belum Ditentukan'}</span>
                       </div>
                     </div>
 

@@ -19,24 +19,54 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const response = await axios.post('https://api.meccaschool.online/api/auth/login', {
-        username: username,
-        password: password,
-        role: 'student'
+      // [UPDATE] Menggunakan Endpoint GraphQL
+      const response = await axios.post('https://api.meccaschool.online/graphql', {
+        query: `
+          mutation Login($username: String!, $password: String!, $role: String!) {
+            login(username: $username, password: $password, role: $role) {
+              token
+              user {
+                id
+                username
+                name
+                role
+              }
+            }
+          }
+        `,
+        variables: {
+          username: username,
+          password: password,
+          role: 'student' // Hardcode role student sesuai portal
+        }
       });
 
-      const token = response.data.token || response.data.data?.token;
+      // [UPDATE] Cek Error dari GraphQL (Karena GraphQL selalu return 200 OK)
+      if (response.data.errors) {
+        throw new Error(response.data.errors[0].message);
+      }
+
+      const loginData = response.data.data?.login;
+      const token = loginData?.token;
 
       if (!token) {
         throw new Error('Token tidak ditemukan dalam respon server');
       }
 
+      // Simpan Token & Data User
       localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(loginData.user));
+      
+      // Redirect ke Dashboard
       router.push('/dashboard'); 
       
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      const msg = err.response?.data?.message || 'Login gagal. Cek username/password.';
+      // Menangkap pesan error dari GraphQL atau Network
+      let msg = 'Login gagal. Cek username/password.';
+      if (err instanceof Error) {
+        msg = err.message;
+      }
       setError(msg);
     } finally {
       setLoading(false);
@@ -44,10 +74,11 @@ export default function LoginPage() {
   };
 
   return (
-    // Container Luar: Menggunakan min-h-screen, flex center, dan padding horizontal (px-4) agar tidak menempel di layar HP
+    // Container Luar
+    // [FIX] bg-linear-to-br diubah jadi bg-gradient-to-br (standar Tailwind)
     <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-blue-50 to-gray-100 px-4 sm:px-6 lg:px-8">
       
-      {/* Kartu Login: Lebar maksimal (max-w-md) tapi full width di layar kecil */}
+      {/* Kartu Login */}
       <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-100">
         
         {/* Header Logo */}
@@ -94,13 +125,13 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold py-3.5 rounded-xl transition-all duration-200 shadow-lg shadow-blue-200 hover:shadow-blue-300 flex justify-center items-center transform active:scale-[0.98]"
+            className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold py-3.5 rounded-xl transition-all duration-200 shadow-lg shadow-blue-200 hover:shadow-blue-300 flex justify-center items-center transform active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed"
           >
             {loading ? <Loader2 className="animate-spin w-5 h-5" /> : 'Masuk ke Portal'}
           </button>
         </form>
 
-        {/* Footer Kecil (Opsional) */}
+        {/* Footer Kecil */}
         <div className="mt-8 text-center">
             <p className="text-xs text-gray-400">
                 &copy; {new Date().getFullYear()} Mecca School. All rights reserved.

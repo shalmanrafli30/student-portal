@@ -177,8 +177,8 @@ export default function BillsPage() {
                                 TAGIHAN
                             </span>
                             <div className="w-1 h-1 rounded-full bg-gray-300"></div> 
-                            <span className="text-[10px] text-gray-400 font-mono truncate max-w-[100px]" title={bill.billNumber}>
-                                {bill.billNumber.replace('BILL-20256940-', '')} {/* Mempersingkat No Tagihan */}
+                            <span className="text-[10px] text-gray-400 font-mono" title={bill.billNumber}>
+                                {bill.billNumber} {/* Mempersingkat No Tagihan */}
                             </span>
                         </div>
                         <h3 className="font-bold text-gray-800 text-lg leading-tight line-clamp-2">

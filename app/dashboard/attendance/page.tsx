@@ -1,23 +1,21 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import api from '@/lib/api';
-import { UserCheck, UserX, Clock, FileText, CalendarCheck, Loader2, BookOpen, AlertCircle } from 'lucide-react';
+import axios from 'axios';
+import { UserCheck, UserX, Clock, FileText, CalendarCheck, Loader2, BookOpen } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 interface Attendance {
   id: number;
   date: string;
   status: 'Present' | 'Absent' | 'Late' | 'Excused';
   createdAt: string;
-  Schedule?: {
-    startTime: string;
-    Subject?: {
-        name: string;
-    }
-  };
+  scheduleId: number;
+  subjectName?: string; // [UPDATE] Field baru dari API
 }
 
 export default function AttendancePage() {
+  const router = useRouter();
   const [attendanceList, setAttendanceList] = useState<Attendance[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -25,8 +23,20 @@ export default function AttendancePage() {
   useEffect(() => {
     const fetchAttendance = async () => {
       try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            router.push('/login');
+            return;
+        }
+        
+        const api = axios.create({
+            baseURL: 'https://api.meccaschool.online/api/student',
+            headers: { Authorization: `Bearer ${token}` }
+        });
+
         const res = await api.get('/attendance');
-        const data = Array.isArray(res.data.data) ? res.data.data : (Array.isArray(res.data) ? res.data : []);
+        // Sesuaikan dengan struktur response pagination
+        const data = Array.isArray(res.data.attendance) ? res.data.attendance : [];
         setAttendanceList(data);
       } catch (error) {
         console.error('Gagal ambil data kehadiran', error);
@@ -36,13 +46,14 @@ export default function AttendancePage() {
     };
 
     fetchAttendance();
-  }, []);
+  }, [router]);
 
   // 2. Logic Grouping
   const groupedAttendance = useMemo(() => {
     const groups: Record<string, Attendance[]> = {};
     attendanceList.forEach((item) => {
-      const subjectName = item.Schedule?.Subject?.name || 'Kegiatan Lain';
+      // [UPDATE] Gunakan subjectName dari root object
+      const subjectName = item.subjectName || 'Kegiatan Lain';
       if (!groups[subjectName]) groups[subjectName] = [];
       groups[subjectName].push(item);
     });
@@ -81,9 +92,9 @@ export default function AttendancePage() {
   );
 
   return (
-    <div className="pb-8"> {/* Padding bottom agar tidak mentok di scroll paling bawah */}
+    <div className="pb-8">
       
-      {/* HEADER SECTION (Responsive Layout) */}
+      {/* HEADER SECTION */}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-8">
         
         {/* Judul Halaman */}
@@ -99,7 +110,7 @@ export default function AttendancePage() {
             </p>
         </div>
         
-        {/* Statistik Global (Full Width di Mobile, Auto di Desktop) */}
+        {/* Statistik Global */}
         <div className="w-full lg:w-auto">
             <div className={`px-5 py-3 md:py-2 rounded-xl shadow-sm border flex items-center justify-between lg:justify-start bg-white transition-colors duration-300 ${globalStats.percentage >= 90 ? 'border-green-200 bg-green-50/50' : 'border-red-200 bg-red-50/50'}`}>
                 <div className="flex items-center">
@@ -128,58 +139,58 @@ export default function AttendancePage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
           {Object.entries(groupedAttendance).map(([subjectName, items]) => {
-             const percentage = calculatePercentage(items);
-             
-             return (
-              <div key={subjectName} className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-gray-200 hover:shadow-md transition-all duration-300 overflow-hidden flex flex-col group">
-                
-                {/* Header Card */}
-                <div className="bg-gray-50 px-4 md:px-5 py-4 border-b border-gray-100 flex justify-between items-center">
-                    <div className="flex items-center overflow-hidden flex-1 mr-2">
-                        <div className="bg-white p-1.5 md:p-2 rounded-lg border mr-2.5 md:mr-3 text-blue-600 shadow-sm shrink-0">
-                            <BookOpen className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                        </div>
-                        <h3 className="font-bold text-gray-800 text-sm md:text-[15px] truncate leading-tight" title={subjectName}>
-                            {subjectName}
-                        </h3>
-                    </div>
-                    
-                    {/* Badge Persentase */}
-                    <div className={`px-2.5 py-1 rounded-lg text-xs font-bold border shrink-0 ${percentage >= 85 ? 'bg-green-100 text-green-700 border-green-200' : 'bg-red-100 text-red-700 border-red-200'}`}>
-                        {percentage}%
-                    </div>
-                </div>
-
-                {/* Body List */}
-                <div className="p-0 flex-1 bg-white">
-                    <div className="divide-y divide-gray-50">
-                        {items.slice(0, 5).map((item) => { 
-                            const config = getStatusConfig(item.status);
-                            const Icon = config.icon;
-                            return (
-                                <div key={item.id} className="px-4 md:px-5 py-3 flex justify-between items-center hover:bg-gray-50 transition-colors">
-                                    <div className="flex items-center text-gray-600">
-                                        <span className="text-xs md:text-sm font-medium">
-                                            {new Date(item.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
-                                        </span>
-                                    </div>
-                                    <div className={`flex items-center px-2 py-1 md:px-2.5 md:py-1 rounded-full text-[10px] md:text-xs font-bold border ${config.color}`}>
-                                        <Icon className="w-3 h-3 mr-1 md:mr-1.5" />
-                                        {config.label}
-                                    </div>
-                                </div>
-                            )
-                        })}
-                        
-                        {items.length > 5 && (
-                            <div className="bg-gray-50/50 p-2 text-center text-[10px] md:text-xs text-gray-400 border-t border-gray-100 cursor-default">
-                                +{items.length - 5} riwayat lainnya
-                            </div>
-                        )}
-                    </div>
-                </div>
+            const percentage = calculatePercentage(items);
+            
+            return (
+            <div key={subjectName} className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-gray-200 hover:shadow-md transition-all duration-300 overflow-hidden flex flex-col group">
+              
+              {/* Header Card */}
+              <div className="bg-gray-50 px-4 md:px-5 py-4 border-b border-gray-100 flex justify-between items-center">
+                  <div className="flex items-center overflow-hidden flex-1 mr-2">
+                      <div className="bg-white p-1.5 md:p-2 rounded-lg border mr-2.5 md:mr-3 text-blue-600 shadow-sm shrink-0">
+                          <BookOpen className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                      </div>
+                      <h3 className="font-bold text-gray-800 text-sm md:text-[15px] truncate leading-tight" title={subjectName}>
+                          {subjectName}
+                      </h3>
+                  </div>
+                  
+                  {/* Badge Persentase */}
+                  <div className={`px-2.5 py-1 rounded-lg text-xs font-bold border shrink-0 ${percentage >= 85 ? 'bg-green-100 text-green-700 border-green-200' : 'bg-red-100 text-red-700 border-red-200'}`}>
+                      {percentage}%
+                  </div>
               </div>
-             );
+
+              {/* Body List */}
+              <div className="p-0 flex-1 bg-white">
+                  <div className="divide-y divide-gray-50">
+                      {items.slice(0, 5).map((item) => { 
+                          const config = getStatusConfig(item.status);
+                          const Icon = config.icon;
+                          return (
+                              <div key={item.id} className="px-4 md:px-5 py-3 flex justify-between items-center hover:bg-gray-50 transition-colors">
+                                  <div className="flex items-center text-gray-600">
+                                      <span className="text-xs md:text-sm font-medium">
+                                          {new Date(item.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
+                                      </span>
+                                  </div>
+                                  <div className={`flex items-center px-2 py-1 md:px-2.5 md:py-1 rounded-full text-[10px] md:text-xs font-bold border ${config.color}`}>
+                                      <Icon className="w-3 h-3 mr-1 md:mr-1.5" />
+                                      {config.label}
+                                  </div>
+                              </div>
+                          )
+                      })}
+                      
+                      {items.length > 5 && (
+                          <div className="bg-gray-50/50 p-2 text-center text-[10px] md:text-xs text-gray-400 border-t border-gray-100 cursor-default">
+                              +{items.length - 5} riwayat lainnya
+                          </div>
+                      )}
+                  </div>
+              </div>
+            </div>
+            );
           })}
         </div>
       )}
